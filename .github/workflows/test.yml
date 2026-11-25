@@ -161,7 +161,7 @@ jobs:
           egress-policy: audit
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: echo "ruby-3.4.0" > .ruby-version
+      - run: echo "ruby-3.4.12" > .ruby-version
       - uses: ./
       - run: ruby -v | grep -F "ruby 3.4.12"
 
@@ -175,7 +175,7 @@ jobs:
           egress-policy: audit
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: echo -e "nodejs 16.0.0\nruby   3.4.0" > .tool-versions
+      - run: echo -e "nodejs 16.0.0\nruby   3.4.12" > .tool-versions
       - uses: ./
       - run: ruby -v | grep -F "ruby 3.4.12"
 
@@ -189,7 +189,7 @@ jobs:
           egress-policy: audit
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: echo -e "[tools]\nnode = '18'\nruby = '3.4.0'" > mise.toml
+      - run: echo -e "[tools]\nnode = '18'\nruby = '3.4.12'" > mise.toml
       - uses: ./
       - run: ruby -v | grep -F "ruby 3.4.12"
 
@@ -456,7 +456,6 @@ jobs:
           bundler-cache: true
       - run: bundle --version | grep -F "Bundler version 1."
 
-  # https://github.com/ruby/setup-ruby/issues/444
   testTwiceInSameJob:
     name: "Test using setup-ruby twice in the same job"
     runs-on: ubuntu-24.04

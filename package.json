@@ -1,7 +1,7 @@
 {
   "name": "@step-security/setup-ruby",
   "private": true,
-  "version": "1.329.0",
+  "version": "1.344.0",
   "description": "Download a prebuilt Ruby and add it to the PATH in 5 seconds",
   "main": "index.js",
   "license": "MIT",

@@ -78,11 +78,7 @@ async function downloadAndExtract(platform, engine, version, rubyPrefix) {
     } catch (error) {
       if (error.message.includes('404')) {
         throw new Error(`Unavailable version ${version} for ${engine} on ${platform}
-<<<<<<< 21e04acd3bfc5f5f0aceb129c88a52ce4df996e2
-          You can request it at https://github.com/step-security/setup-ruby/issues
-=======
           ${await unavailableVersionHint(platform, engine, version)}
->>>>>>> f70ce7fbcf0aa7f24452586ddd9a06c6989530e0
           Cause: ${error.message}`)
       } else {
         throw error
@@ -107,7 +103,7 @@ async function downloadAndExtract(platform, engine, version, rubyPrefix) {
 // Newer runner images usually only have builds of the latest patch release of each series,
 // so point to that release if it is available, or explain that the series is not available.
 async function unavailableVersionHint(platform, engine, version) {
-  const request = 'You can request it at https://github.com/ruby/setup-ruby/issues'
+  const request = 'You can request it at https://github.com/step-security/setup-ruby/issues'
   const series = version.split('.').slice(0, 2).join('.')
   const latest = getAvailableVersions(platform, engine)
     .filter(v => v.startsWith(`${series}.`) && common.isStableVersion(engine, v))
