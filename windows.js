@@ -22,10 +22,11 @@ export function getAvailableVersions(_platform, engine) {
 export async function install(platform, engine, version) {
   const url = rubyInstallerVersions[version][os.arch()]
 
-  if (!url.endsWith('.7z')) {
-    throw new Error(`URL should end in .7z: ${url}`)
+  const ext = path.posix.extname(url)
+  if (ext !== '.7z' && ext !== '.zip') {
+    throw new Error(`URL should end in .7z or .zip: ${url}`)
   }
-  const base = path.posix.basename(url, '.7z')
+  const base = path.posix.basename(url, ext)
 
   let rubyPrefix, inToolCache
   if (common.shouldUseToolCache(engine, version)) {
@@ -43,13 +44,6 @@ export async function install(platform, engine, version) {
     await downloadAndExtract(engine, version, url, base, rubyPrefix);
   }
 
-  const paths = [`${rubyPrefix}\\bin`]
-  const windowsToolchain = core.getInput('windows-toolchain')
-  if (windowsToolchain === 'none') {
-    common.setupPath(paths)
-    return rubyPrefix
-  }
-
   const toolchainUrl = toolchainVersions[version][os.arch()]
 
   // Examples:
@@ -57,6 +51,17 @@ export async function install(platform, engine, version) {
   // - msys2-clangarm64.7z
   // - vcpkg-x64-windows.7z
   const toolchainName = path.posix.basename(toolchainUrl).split('-')[0].toLowerCase()
+
+  if (toolchainName === 'devkit' || version === 'mswin') {
+    await setupSslCertFile()
+  }
+
+  const paths = [`${rubyPrefix}\\bin`]
+  const windowsToolchain = core.getInput('windows-toolchain')
+  if (windowsToolchain === 'none') {
+    common.setupPath(paths)
+    return rubyPrefix
+  }
 
   if (toolchainName === 'msys2') {
     paths.push(...await installMSYS2(toolchainUrl, rubyPrefix))
@@ -148,16 +153,24 @@ async function installMSYS2(url, rubyPrefix = process.env.RUNNER_TEMP) {
   return [`${msys2Path}\\${msys2Type}\\bin`, `${msys2Path}\\usr\\bin`]
 }
 
-async function installMSYS1(url) {
-  const certFile = [
-    'C:\\Program Files\\Git\\ucrt64\\etc\\ssl\\cert.pem',
-    'C:\\Program Files\\Git\\mingw64\\etc\\ssl\\cert.pem',
-    'C:\\Program Files\\Git\\mingw64\\ssl\\cert.pem',
-  ].find(file => fs.existsSync(file))
-  if (certFile === undefined) {
-    throw new Error("Cannot find Git's cert file")
-  }
+// DevKit and mswin Rubies have no usable CA certificates on runners, so they use the bundle of Git for Windows
+async function setupSslCertFile() {
+  await core.group('Setting up CA certificates', async () => {
+    const certFile = [
+      'C:\\Program Files\\Git\\ucrt64\\etc\\ssl\\cert.pem',
+      'C:\\Program Files\\Git\\mingw64\\etc\\ssl\\cert.pem',
+      'C:\\Program Files\\Git\\mingw64\\ssl\\cert.pem',
+      'C:\\Program Files\\Git\\clangarm64\\etc\\ssl\\cert.pem',
+    ].find(file => fs.existsSync(file))
+    if (certFile === undefined) {
+      throw new Error("Cannot find Git's cert file")
+    }
 
+    exportEnv({ SSL_CERT_FILE: certFile })
+  })
+}
+
+async function installMSYS1(url) {
   const downloadPath = await common.measure('Downloading msys1 build tools', async () => {
     console.log(url)
     return await common.download(url)
@@ -182,8 +195,7 @@ async function installMSYS1(url) {
       CPP: 'cpp',
       CXX: 'g++',
       MAKE: 'make',
-      RI_DEVKIT: msys1Path,
-      SSL_CERT_FILE: certFile
+      RI_DEVKIT: msys1Path
     })
   })
 
@@ -203,7 +215,7 @@ async function installVCPKG(url) {
   await common.measure('Extracting  mswin vcpkg packages', async () =>
     exec.exec('7z', ['x', downloadPath, '-aoa', '-bd', `-o${extractPath}`], { silent: true }))
 
-  return await common.measure('Setting up MSVC environment', async () => {
+  const paths = await common.measure('Setting up MSVC environment', async () => {
     const cmd = 'vswhere -latest -property installationPath'
     const vcVarsBat = os.arch() === 'arm64' ? 'vcvarsarm64.bat' : 'vcvars64.bat'
     const vcVars = `${cp.execSync(cmd).toString().trim()}\\VC\\Auxiliary\\Build\\${vcVarsBat}`
@@ -214,6 +226,23 @@ async function installVCPKG(url) {
 
     return exportCommandEnv(`set "MAKE=nmake" && "${vcVars}"`)
   })
+
+  const vcpkgDir = `${extractPath}\\installed\\${os.arch()}-windows`
+  await core.group('Setting up vcpkg', async () => {
+    // mswin Rubies do not record the vcpkg location in configure_args, so the compiler and linker find it through INCLUDE and LIB
+    exportEnv({
+      INCLUDE: `${vcpkgDir}\\include;${process.env.INCLUDE}`,
+      LIB: `${vcpkgDir}\\lib;${process.env.LIB}`
+    })
+
+    // Otherwise mkmf runs the MSYS2 pkg-config, whose MinGW flags break MSVC builds. mkmf accepts an absolute PKG_CONFIG only with forward slashes, and pkgconf alone searches just the missing tools\lib\pkgconfig
+    exportEnv({
+      PKG_CONFIG: `${vcpkgDir}\\tools\\pkgconf\\pkgconf.exe`.replaceAll('\\', '/'),
+      PKG_CONFIG_PATH: `${vcpkgDir}\\lib\\pkgconfig`
+    })
+  })
+
+  return [...paths, `${vcpkgDir}\\bin`]
 }
 
 // Run a cmd command, export its environment, and return new paths

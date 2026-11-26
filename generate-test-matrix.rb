@@ -18,7 +18,6 @@ end
 
 # Runners
 runners = %w[
-  macos-14
   macos-15
   macos-15-intel
   ubuntu-22.04
@@ -61,8 +60,11 @@ truffleruby_versions = %w[truffleruby truffleruby-head truffleruby+graalvm truff
 matrix += (macos_arm64_runners + ubuntu_runners).product(truffleruby_versions)
 
 # ruby-loco: head
-ruby_loco_versions = %w[mingw mswin ucrt]
+ruby_loco_versions = %w[mingw ucrt]
 matrix += windows_x64_runners.product(ruby_loco_versions)
+
+# mswin: head
+matrix += windows_runners.product(%w[mswin])
 
 # asan: latest release + head
 asan_versions = %w[asan-release asan]
@@ -75,7 +77,7 @@ matrix -= macos_arm64_runners.product(%w[1.9 2.0 2.1 2.2 2.3 2.4 2.5])
 # These old Rubies fail to compile or segfault on Linux arm64
 matrix -= ubuntu_arm64_runners.product(%w[1.9 2.0 2.1 2.2])
 # These old Rubies fail to compile on ubuntu-26.04
-matrix -= ubuntu2604_runners.product(%w[1.9 2.0 2.1 2.2 2.3 2.4 2.5 2.6 2.7 3.0 3.1])
+matrix -= ubuntu2604_runners.product(%w[1.9 2.0 2.1 2.2])
 # RubyInstaller windows-arm64 builds only exist for Ruby 3.4+
 matrix -= windows_arm64_runners.product(%w[2.0 2.1 2.2 2.3 2.4 2.5 2.6 2.7 3.0 3.1 3.2 3.3])
 
